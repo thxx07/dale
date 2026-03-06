@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -146,7 +147,7 @@
         /* Tela de Boot */
         #boot-screen {
             position: fixed; inset: 0; background: #000; z-index: 9999;
-            display: flex; flex-direction: column; justify-content: center; items-center;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
     </style>
 </head>
@@ -291,44 +292,52 @@
         let gainNodeHum, gainNodeStatic;
 
         function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // 1.1 Zumbido Ambiente (Hum)
-            humOscillator = audioCtx.createOscillator();
-            humOscillator.type = 'sine';
-            humOscillator.frequency.value = 55; // Frequência baixa e assustadora
-            
-            gainNodeHum = audioCtx.createGain();
-            gainNodeHum.gain.value = 0.2; // Volume inicial
-            
-            humOscillator.connect(gainNodeHum);
-            gainNodeHum.connect(audioCtx.destination);
-            humOscillator.start();
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                // 1.1 Zumbido Ambiente (Hum)
+                humOscillator = audioCtx.createOscillator();
+                humOscillator.type = 'sine';
+                humOscillator.frequency.value = 55; // Frequência baixa e assustadora
+                
+                gainNodeHum = audioCtx.createGain();
+                gainNodeHum.gain.value = 0.2; // Volume inicial
+                
+                humOscillator.connect(gainNodeHum);
+                gainNodeHum.connect(audioCtx.destination);
+                humOscillator.start();
 
-            // 1.2 Chiado da Câmera (White Noise)
-            const bufferSize = audioCtx.sampleRate * 2; // 2 segundos
-            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
+                // 1.2 Chiado da Câmara (White Noise)
+                const bufferSize = audioCtx.sampleRate * 2; // 2 segundos
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                staticNoiseNode = audioCtx.createBufferSource();
+                staticNoiseNode.buffer = noiseBuffer;
+                staticNoiseNode.loop = true;
+                
+                gainNodeStatic = audioCtx.createGain();
+                gainNodeStatic.gain.value = 0; // Começa mudo
+                
+                // Filtro para fazer o chiado soar como uma TV velha
+                const bandpass = audioCtx.createBiquadFilter();
+                bandpass.type = 'bandpass';
+                bandpass.frequency.value = 1000;
+                
+                staticNoiseNode.connect(bandpass);
+                bandpass.connect(gainNodeStatic);
+                gainNodeStatic.connect(audioCtx.destination);
+                staticNoiseNode.start();
+            } catch (e) {
+                console.warn("Áudio bloqueado pelo navegador. O jogo continuará sem som:", e);
+                audioCtx = null; // Evita que o resto do jogo quebre
             }
-            
-            staticNoiseNode = audioCtx.createBufferSource();
-            staticNoiseNode.buffer = noiseBuffer;
-            staticNoiseNode.loop = true;
-            
-            gainNodeStatic = audioCtx.createGain();
-            gainNodeStatic.gain.value = 0; // Começa mudo
-            
-            // Filtro para fazer o chiado soar como uma TV velha
-            const bandpass = audioCtx.createBiquadFilter();
-            bandpass.type = 'bandpass';
-            bandpass.frequency.value = 1000;
-            
-            staticNoiseNode.connect(bandpass);
-            bandpass.connect(gainNodeStatic);
-            gainNodeStatic.connect(audioCtx.destination);
-            staticNoiseNode.start();
         }
 
         function playBlip() {
@@ -645,22 +654,33 @@
             }
         }
 
-        window.onload = () => {
+        // Garante que o texto inicie independente de como a janela carregou no preview
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(typeBoot, 500);
-        };
+        } else {
+            window.addEventListener('load', () => setTimeout(typeBoot, 500));
+        }
 
         document.getElementById('start-btn').onclick = () => {
-            document.getElementById('boot-screen').classList.add('hidden');
-            document.getElementById('main-os').classList.remove('hidden');
+            // Força a remoção da tela de boot e a exibição do OS
+            document.getElementById('boot-screen').style.display = 'none';
+            
+            const mainOs = document.getElementById('main-os');
+            mainOs.classList.remove('hidden');
+            mainOs.style.display = 'flex'; // Garante que a classe do Tailwind não crie conflito
             
             initAudio();
             drawStatic();
-            GAME_STATE.usage = 2; // Câmeras ligadas
+            GAME_STATE.usage = 2; // Câmaras ligadas
             updatePowerUI();
             updateCameraVisuals();
             
-            // Inicia o áudio do chiado baixo
-            gainNodeStatic.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            // Inicia o áudio apenas se o contexto não foi bloqueado
+            if (audioCtx && gainNodeStatic) {
+                try {
+                    gainNodeStatic.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                } catch(e) {}
+            }
         };
 
     </script>
