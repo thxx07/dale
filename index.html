@@ -1,0 +1,668 @@
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fazbear OS - Security Terminal</title>
+    
+    <!-- Tailwind CSS para o layout base -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para ícones da interface -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fonte pixelada para atmosfera retrô -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --fnaf-red: #cc0000;
+            --crt-bg: #0a0a0a;
+            --text-glow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #000;
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            color: #fff;
+            user-select: none;
+        }
+
+        /* Efeito de Monitor CRT Avançado */
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            z-index: 101;
+            pointer-events: none;
+        }
+
+        .screen-curve {
+            animation: flicker 0.15s infinite;
+            text-shadow: 1px 0px 1px #ff0000, -1px 0px 1px #00ffff;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.98; }
+            50% { opacity: 0.95; }
+            100% { opacity: 1; }
+        }
+
+        /* Aberração visual quando a câmera troca */
+        .glitch-effect {
+            animation: glitch-anim 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+
+        /* Botões das Câmeras */
+        .cam-btn {
+            background-color: #333;
+            border: 2px solid #555;
+            color: white;
+            font-family: 'VT323', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .cam-btn:hover { background-color: #555; }
+        .cam-btn.active { background-color: #fff; color: #000; border-color: #fff; }
+
+        /* UI do Sistema */
+        .hud-text { font-size: 1.5rem; text-shadow: var(--text-glow); }
+        .red-alert { color: var(--fnaf-red); animation: pulse-red 1s infinite; }
+        
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Layout do Mapa */
+        .map-container {
+            position: relative;
+            width: 300px;
+            height: 250px;
+            border: 2px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+        }
+
+        .cam-btn-pos { position: absolute; padding: 2px 8px; font-size: 1rem; }
+
+        /* Estática procedural da câmera */
+        #static-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.4;
+            mix-blend-mode: overlay;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Animatronics em SVG Silhouettes */
+        .animatronic {
+            position: absolute;
+            transition: opacity 0.5s;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,1));
+            display: none;
+            z-index: 5;
+        }
+
+        /* Scanline em movimento */
+        .scanline {
+            width: 100%; height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            position: absolute;
+            animation: scanline-move 6s linear infinite;
+            z-index: 15;
+            pointer-events: none;
+        }
+        @keyframes scanline-move {
+            0% { top: -10%; }
+            100% { top: 110%; }
+        }
+
+        /* Tela de Boot */
+        #boot-screen {
+            position: fixed; inset: 0; background: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; items-center;
+        }
+    </style>
+</head>
+<body class="crt screen-curve">
+
+    <!-- Tela de Inicialização / Permissão de Áudio -->
+    <div id="boot-screen" class="p-8">
+        <div class="max-w-2xl mx-auto w-full">
+            <p id="boot-text" class="text-green-500 text-xl whitespace-pre-line"></p>
+            <button id="start-btn" class="mt-8 hidden border border-green-500 text-green-500 px-6 py-2 hover:bg-green-500 hover:text-black transition-colors font-bold text-xl uppercase tracking-widest">
+                Iniciar Sistema FAZBEAR OS
+            </button>
+        </div>
+    </div>
+
+    <!-- Tela Principal do Terminal -->
+    <div id="main-os" class="hidden w-full h-full relative flex flex-col">
+        
+        <!-- Header HUD -->
+        <header class="w-full flex justify-between p-6 z-20 pointer-events-none">
+            <div class="hud-text">
+                <p>Noite 1</p>
+                <p>12:00 AM</p>
+            </div>
+            <div class="hud-text text-right">
+                <p>Bateria: <span id="battery-level">100</span>%</p>
+                <p>Uso: <span id="usage-meter" class="text-green-400">▮▯▯▯</span></p>
+            </div>
+        </header>
+
+        <div class="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 red-alert text-2xl font-bold tracking-widest border-2 border-red-600 px-4 py-1 hidden" id="rec-icon">
+            ● REC
+        </div>
+
+        <!-- Visão Principal (Câmera ou Database) -->
+        <main class="flex-1 relative border-y-2 border-gray-800 bg-[#050505] overflow-hidden">
+            <div class="scanline"></div>
+            <canvas id="static-canvas"></canvas>
+            
+            <!-- Imagem de Fundo da Câmera Simulada (Padrão CSS Gradients) -->
+            <div id="camera-view" class="w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-800 via-gray-950 to-black relative flex items-center justify-center transition-all duration-300">
+                <div class="text-gray-700 text-6xl opacity-20 absolute font-bold tracking-widest">SINAL DE VÍDEO</div>
+                
+                <!-- Silhuetas dos Animatronics geradas via SVG inline para ser autocontido -->
+                <!-- Freddy Silhouette -->
+                <svg id="anim-freddy" class="animatronic w-64 h-64" viewBox="0 0 100 100">
+                    <path d="M30,50 C30,30 70,30 70,50 C80,50 85,60 80,70 C75,80 60,90 50,90 C40,90 25,80 20,70 C15,60 20,50 30,50 Z" fill="#111"/>
+                    <path d="M40,20 L40,35 L60,35 L60,20 Z" fill="#111"/> <!-- Hat -->
+                    <circle cx="25" cy="40" r="10" fill="#111"/> <!-- Ear L -->
+                    <circle cx="75" cy="40" r="10" fill="#111"/> <!-- Ear R -->
+                    <!-- Glowing Eyes -->
+                    <circle cx="40" cy="55" r="3" fill="#fff" class="animate-pulse shadow-[0_0_10px_#fff]"/>
+                    <circle cx="60" cy="55" r="3" fill="#fff" class="animate-pulse shadow-[0_0_10px_#fff]"/>
+                </svg>
+
+                <!-- Bonnie Silhouette -->
+                <svg id="anim-bonnie" class="animatronic w-64 h-64" viewBox="0 0 100 100">
+                    <path d="M35,50 C35,35 65,35 65,50 C75,60 70,80 50,85 C30,80 25,60 35,50 Z" fill="#1a1a2e"/>
+                    <path d="M35,40 C30,20 40,10 45,35 Z" fill="#1a1a2e"/> <!-- Ear L -->
+                    <path d="M65,40 C70,20 60,10 55,35 Z" fill="#1a1a2e"/> <!-- Ear R -->
+                    <circle cx="42" cy="55" r="2.5" fill="#ff00ff" class="shadow-[0_0_8px_#ff00ff]"/>
+                    <circle cx="58" cy="55" r="2.5" fill="#ff00ff" class="shadow-[0_0_8px_#ff00ff]"/>
+                </svg>
+
+                 <!-- Chica Silhouette -->
+                 <svg id="anim-chica" class="animatronic w-56 h-56" viewBox="0 0 100 100">
+                    <circle cx="50" cy="55" r="25" fill="#2a2a00"/>
+                    <path d="M30,60 Q50,75 70,60" stroke="#111" stroke-width="4" fill="transparent"/> <!-- Beak line -->
+                    <circle cx="40" cy="45" r="4" fill="#ff0" class="shadow-[0_0_10px_#ff0]"/>
+                    <circle cx="60" cy="45" r="4" fill="#ff0" class="shadow-[0_0_10px_#ff0]"/>
+                </svg>
+            </div>
+
+            <!-- Database / Lore Overlay (Oculto ao usar Câmeras) -->
+            <div id="database-view" class="absolute inset-0 bg-blue-900/20 backdrop-blur-sm p-8 hidden flex flex-col">
+                <h2 class="text-3xl font-bold mb-4 border-b border-blue-500 pb-2">Sistema de Arquivos Fazbear</h2>
+                <div class="flex-1 grid grid-cols-2 gap-8">
+                    <div class="border border-blue-500/50 p-4 bg-black/60 cursor-pointer hover:bg-blue-900/40 transition-colors" onclick="showLore(1)">
+                        <h3 class="text-xl text-blue-400"><i class="fa-solid fa-file-lines mr-2"></i>Incidente_1987.log</h3>
+                        <p class="text-sm text-gray-400 mt-2">Relatório de segurança do gerente diurno.</p>
+                    </div>
+                    <div class="border border-blue-500/50 p-4 bg-black/60 cursor-pointer hover:bg-blue-900/40 transition-colors" onclick="showLore(2)">
+                        <h3 class="text-xl text-blue-400"><i class="fa-solid fa-wrench mr-2"></i>Manutencao_Animatronicos.pdf</h3>
+                        <p class="text-sm text-gray-400 mt-2">Avisos sobre o odor e fluidos nas carcaças.</p>
+                    </div>
+                </div>
+                <div id="lore-content" class="mt-8 p-4 border border-green-500 bg-black/80 text-green-400 text-lg hidden"></div>
+            </div>
+
+            <!-- UI Inferior Direita: Mapa das Câmeras -->
+            <div class="absolute bottom-4 right-4 z-20" id="camera-ui">
+                <div class="text-right mb-2 text-xl font-bold px-2 bg-black/50 inline-block border border-gray-600" id="current-cam-name">CAM 1A - Palco Principal</div>
+                <div class="map-container">
+                    <!-- Esboço do Mapa SVG -->
+                    <svg width="100%" height="100%" viewBox="0 0 300 250" class="absolute inset-0 opacity-30 pointer-events-none">
+                        <rect x="100" y="20" width="100" height="60" fill="none" stroke="white" stroke-width="2"/> <!-- Show Stage -->
+                        <rect x="20" y="80" width="80" height="80" fill="none" stroke="white" stroke-width="2"/> <!-- Dining Area L -->
+                        <rect x="200" y="80" width="80" height="80" fill="none" stroke="white" stroke-width="2"/> <!-- Dining Area R -->
+                        <rect x="120" y="160" width="60" height="40" fill="none" stroke="white" stroke-width="2"/> <!-- Office -->
+                        <path d="M100,50 L20,50 L20,80 M200,50 L280,50 L280,80 M60,160 L120,160 M240,160 L180,160" stroke="white" stroke-width="2" fill="none" stroke-dasharray="5,5"/>
+                    </svg>
+                    
+                    <!-- Botões -->
+                    <button class="cam-btn cam-btn-pos active" style="top: 25px; left: 115px;" onclick="switchCam('1A', 'Palco Principal')">1A</button>
+                    <button class="cam-btn cam-btn-pos" style="top: 90px; left: 30px;" onclick="switchCam('1B', 'Área de Refeições')">1B</button>
+                    <button class="cam-btn cam-btn-pos" style="top: 90px; left: 210px;" onclick="switchCam('1C', 'Enseada do Pirata')">1C</button>
+                    <button class="cam-btn cam-btn-pos" style="top: 140px; left: 30px;" onclick="switchCam('2A', 'Corredor Oeste')">2A</button>
+                    <button class="cam-btn cam-btn-pos" style="top: 140px; left: 210px;" onclick="switchCam('2B', 'Corredor Leste')">2B</button>
+                    
+                    <div class="absolute bottom-2 right-2 text-xs text-gray-400 bg-black px-1 border border-gray-600">SISTEMA DE SEGURANÇA</div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Barra de Controle Inferior -->
+        <footer class="h-20 bg-gray-900 border-t-2 border-gray-700 flex items-center justify-center gap-8 relative z-20">
+            <button id="toggle-sys-btn" class="px-6 py-2 bg-blue-900 hover:bg-blue-700 text-white font-bold text-xl border-2 border-blue-400 rounded transition-all shadow-[0_0_15px_rgba(0,0,255,0.3)]">
+                Acessar Banco de Dados
+            </button>
+            <button id="toggle-cam-btn" class="px-6 py-2 bg-gray-700 hover:bg-gray-500 text-white font-bold text-xl border-2 border-gray-400 rounded transition-all hidden">
+                Retornar às Câmeras
+            </button>
+            <button id="reboot-btn" class="px-4 py-2 bg-red-900 hover:bg-red-700 text-white font-bold border-2 border-red-500 rounded hidden" onclick="location.reload()">
+                Reiniciar Sistema
+            </button>
+        </footer>
+        
+    </div>
+
+    <!-- Script de Lógica Complexa (Engine) -->
+    <script>
+        /**
+         * ENGINE DO FAZBEAR OS TERMINAL
+         * Contém: Procedural Audio, Canvas Renderer, State Machine, Game Loop.
+         */
+
+        // --- 1. Audio Engine (Web Audio API) ---
+        // Geramos sons processualmente para evitar dependência de arquivos externos que podem quebrar.
+        let audioCtx;
+        let humOscillator, staticNoiseNode;
+        let gainNodeHum, gainNodeStatic;
+
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // 1.1 Zumbido Ambiente (Hum)
+            humOscillator = audioCtx.createOscillator();
+            humOscillator.type = 'sine';
+            humOscillator.frequency.value = 55; // Frequência baixa e assustadora
+            
+            gainNodeHum = audioCtx.createGain();
+            gainNodeHum.gain.value = 0.2; // Volume inicial
+            
+            humOscillator.connect(gainNodeHum);
+            gainNodeHum.connect(audioCtx.destination);
+            humOscillator.start();
+
+            // 1.2 Chiado da Câmera (White Noise)
+            const bufferSize = audioCtx.sampleRate * 2; // 2 segundos
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            
+            staticNoiseNode = audioCtx.createBufferSource();
+            staticNoiseNode.buffer = noiseBuffer;
+            staticNoiseNode.loop = true;
+            
+            gainNodeStatic = audioCtx.createGain();
+            gainNodeStatic.gain.value = 0; // Começa mudo
+            
+            // Filtro para fazer o chiado soar como uma TV velha
+            const bandpass = audioCtx.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 1000;
+            
+            staticNoiseNode.connect(bandpass);
+            bandpass.connect(gainNodeStatic);
+            gainNodeStatic.connect(audioCtx.destination);
+            staticNoiseNode.start();
+        }
+
+        function playBlip() {
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function glitchSound() {
+            if(!audioCtx) return;
+            gainNodeStatic.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNodeStatic.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.3);
+        }
+
+        // --- 2. Renderização de Canvas (Estática) ---
+        const canvas = document.getElementById('static-canvas');
+        const ctx = canvas.getContext('2d');
+        let staticAnimId;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawStatic() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const idata = ctx.createImageData(w, h);
+            const buffer32 = new Uint32Array(idata.data.buffer);
+            const len = buffer32.length;
+            
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < 0.5) {
+                    buffer32[i] = 0xff000000; // Preto
+                } else {
+                    // Tons de cinza para estática
+                    const color = Math.floor(Math.random() * 255);
+                    buffer32[i] = (255 << 24) | (color << 16) | (color << 8) | color;
+                }
+            }
+            ctx.putImageData(idata, 0, 0);
+            staticAnimId = requestAnimationFrame(drawStatic);
+        }
+
+        // --- 3. Máquina de Estados e Lógica de Jogo ---
+        const GAME_STATE = {
+            time: 0, // 0 a 6 (12am a 6am)
+            power: 100,
+            usage: 1, // 1 a 4
+            currentCam: '1A',
+            isCamActive: true,
+            isDead: false,
+            animatronics: {
+                freddy: { location: '1A', active: true },
+                bonnie: { location: '1A', active: true },
+                chica:  { location: '1A', active: true }
+            }
+        };
+
+        const DOM = {
+            battery: document.getElementById('battery-level'),
+            usage: document.getElementById('usage-meter'),
+            camView: document.getElementById('camera-view'),
+            dbView: document.getElementById('database-view'),
+            btnSys: document.getElementById('toggle-sys-btn'),
+            btnCam: document.getElementById('toggle-cam-btn'),
+            camUI: document.getElementById('camera-ui'),
+            recIcon: document.getElementById('rec-icon'),
+            camName: document.getElementById('current-cam-name')
+        };
+
+        // Atualiza UI de Energia
+        function updatePowerUI() {
+            DOM.battery.innerText = Math.max(0, Math.floor(GAME_STATE.power));
+            if(GAME_STATE.power <= 0 && !GAME_STATE.isDead) triggerPowerOutage();
+            
+            let bars = '';
+            for(let i=0; i<4; i++) {
+                bars += (i < GAME_STATE.usage) ? '▮' : '▯';
+            }
+            DOM.usage.innerText = bars;
+            
+            // Cores baseadas no uso
+            if(GAME_STATE.usage === 1) DOM.usage.className = 'text-green-400';
+            else if(GAME_STATE.usage === 2) DOM.usage.className = 'text-yellow-400';
+            else DOM.usage.className = 'text-red-500';
+        }
+
+        // Loop de Dreno de Bateria
+        setInterval(() => {
+            if(GAME_STATE.power > 0 && GAME_STATE.isCamActive && !GAME_STATE.isDead) {
+                // Fórmulas matemáticas para consumo de energia
+                const drainRate = 0.1 + (GAME_STATE.usage * 0.08);
+                GAME_STATE.power -= drainRate;
+                updatePowerUI();
+            }
+        }, 1000);
+
+        // Relógio (1 Hora = ~60 segundos na simulação)
+        let clockInterval = setInterval(() => {
+            if(!GAME_STATE.isDead && GAME_STATE.power > 0) {
+                GAME_STATE.time++;
+                document.querySelector('header p:nth-child(2)').innerText = `${GAME_STATE.time === 0 ? 12 : GAME_STATE.time}:00 AM`;
+                
+                // Mover animatronics artificialmente a cada "hora"
+                moveAnimatronics();
+                updateCameraVisuals();
+
+                if(GAME_STATE.time === 6) {
+                    winGame();
+                }
+            }
+        }, 60000); // Mude para 10000 para testar rápido
+
+        // Lógica de Movimentação Falsa (IA simples)
+        const CAMS = ['1A', '1B', '1C', '2A', '2B'];
+        function moveAnimatronics() {
+            if(Math.random() > 0.4) {
+                GAME_STATE.animatronics.bonnie.location = CAMS[Math.floor(Math.random() * CAMS.length)];
+                glitchSound();
+            }
+            if(Math.random() > 0.5) {
+                GAME_STATE.animatronics.chica.location = CAMS[Math.floor(Math.random() * CAMS.length)];
+                glitchSound();
+            }
+            if(Math.random() > 0.8 && GAME_STATE.time > 2) {
+                 // Freddy se move menos
+                 GAME_STATE.animatronics.freddy.location = CAMS[Math.floor(Math.random() * CAMS.length)];
+                 glitchSound();
+            }
+        }
+
+        // --- 4. Interatividade UI ---
+
+        window.switchCam = function(camId, camName) {
+            if(GAME_STATE.power <= 0) return;
+            
+            playBlip();
+            glitchSound();
+            GAME_STATE.currentCam = camId;
+            DOM.camName.innerText = `CAM ${camId} - ${camName}`;
+            
+            // Atualiza botões
+            document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Glitch Effect
+            DOM.camView.classList.add('glitch-effect');
+            setTimeout(() => DOM.camView.classList.remove('glitch-effect'), 300);
+
+            updateCameraVisuals();
+        };
+
+        function updateCameraVisuals() {
+            // Ocultar todos
+            document.getElementById('anim-freddy').style.display = 'none';
+            document.getElementById('anim-bonnie').style.display = 'none';
+            document.getElementById('anim-chica').style.display = 'none';
+
+            // Mostrar dependendo da câmera atual
+            let occupied = false;
+            
+            if(GAME_STATE.animatronics.freddy.location === GAME_STATE.currentCam) {
+                const el = document.getElementById('anim-freddy');
+                el.style.display = 'block';
+                el.style.left = '40%'; el.style.top = '30%';
+                occupied = true;
+            }
+            if(GAME_STATE.animatronics.bonnie.location === GAME_STATE.currentCam) {
+                const el = document.getElementById('anim-bonnie');
+                el.style.display = 'block';
+                el.style.left = occupied ? '20%' : '50%'; el.style.top = '40%';
+                occupied = true;
+            }
+            if(GAME_STATE.animatronics.chica.location === GAME_STATE.currentCam) {
+                const el = document.getElementById('anim-chica');
+                el.style.display = 'block';
+                el.style.left = occupied ? '60%' : '30%'; el.style.top = '35%';
+            }
+
+            // Mudar fundo falso
+            const colors = {
+                '1A': 'from-gray-800 via-gray-950 to-black',
+                '1B': 'from-blue-900 via-gray-900 to-black',
+                '1C': 'from-purple-900 via-gray-900 to-black',
+                '2A': 'from-green-900 via-gray-900 to-black',
+                '2B': 'from-red-900 via-gray-900 to-black'
+            };
+            DOM.camView.className = `w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${colors[GAME_STATE.currentCam]} relative flex items-center justify-center transition-all duration-300`;
+        }
+
+        DOM.btnSys.onclick = () => {
+            playBlip();
+            GAME_STATE.isCamActive = false;
+            GAME_STATE.usage = 1;
+            updatePowerUI();
+            
+            DOM.camView.classList.add('hidden');
+            DOM.camUI.classList.add('hidden');
+            DOM.recIcon.classList.add('hidden');
+            
+            DOM.dbView.classList.remove('hidden');
+            DOM.btnSys.classList.add('hidden');
+            DOM.btnCam.classList.remove('hidden');
+            
+            gainNodeStatic.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        };
+
+        DOM.btnCam.onclick = () => {
+            playBlip();
+            GAME_STATE.isCamActive = true;
+            GAME_STATE.usage = 2; // Câmera gasta mais energia
+            updatePowerUI();
+            
+            DOM.dbView.classList.add('hidden');
+            DOM.btnCam.classList.add('hidden');
+            
+            DOM.camView.classList.remove('hidden');
+            DOM.camUI.classList.remove('hidden');
+            DOM.recIcon.classList.remove('hidden');
+            DOM.btnSys.classList.remove('hidden');
+            
+            glitchSound();
+        };
+
+        // --- 5. Lore e Eventos Especiais ---
+        window.showLore = function(id) {
+            playBlip();
+            const content = document.getElementById('lore-content');
+            content.classList.remove('hidden');
+            if(id === 1) {
+                content.innerHTML = "<strong>LOG: 11/1987</strong><br>Os robôs estão agindo de forma estranha perto dos adultos. Eles encaram. Lembrete: Não permitir que fiquem muito tempo livres pela loja durante o dia.";
+            } else {
+                content.innerHTML = "<strong>AVISO DE MANUTENÇÃO</strong><br>Avisamos a todos os funcionários que os trajes antigos devem ser inspecionados. Clientes relataram mau cheiro e o que parece ser muco e sangue ao redor dos olhos e boca dos mascotes. Por favor, limpem.";
+            }
+        };
+
+        function triggerPowerOutage() {
+            GAME_STATE.isDead = true;
+            // Apaga tudo
+            document.body.innerHTML = '';
+            document.body.style.backgroundColor = '#000';
+            
+            if(audioCtx) {
+                gainNodeHum.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+                gainNodeStatic.gain.setValueAtTime(0, audioCtx.currentTime);
+            }
+            cancelAnimationFrame(staticAnimId);
+
+            // Toca musiquinha assustadora falsa usando osciladores após delay
+            setTimeout(() => {
+                let osc = audioCtx.createOscillator();
+                let g = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(349.23, audioCtx.currentTime); // F4
+                osc.frequency.setValueAtTime(329.63, audioCtx.currentTime + 1); // E4
+                g.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 3);
+                osc.connect(g);
+                g.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 3);
+                
+                // Jumpscare leve e seguro (texto piscando)
+                setTimeout(() => {
+                    document.body.innerHTML = '<div style="color:red; font-size: 5rem; text-align:center; margin-top: 20%; font-family: sans-serif; font-weight: bold; animation: glitch-anim 0.1s infinite">GAME OVER</div><button onclick="location.reload()" style="display:block; margin: 50px auto; padding: 10px 20px; font-size: 20px;">Reiniciar</button>';
+                    let loudOsc = audioCtx.createOscillator();
+                    loudOsc.type = 'sawtooth';
+                    loudOsc.frequency.value = 100;
+                    loudOsc.connect(audioCtx.destination);
+                    loudOsc.start();
+                    loudOsc.stop(audioCtx.currentTime + 0.5);
+                }, 4000);
+            }, 3000);
+        }
+
+        function winGame() {
+            GAME_STATE.isDead = true;
+            document.body.innerHTML = '<div style="color:yellow; font-size: 4rem; text-align:center; margin-top: 20%;">6:00 AM<br><span style="font-size: 2rem; color: white;">Você sobreviveu.</span></div><button onclick="location.reload()" style="display:block; margin: 50px auto; padding: 10px 20px; font-size: 20px; cursor: pointer;">Finalizar Turno</button>';
+            if(audioCtx) audioCtx.suspend();
+        }
+
+        // --- 6. Boot Sequence (Segurança do Navegador para Áudio) ---
+        const bootText = document.getElementById('boot-text');
+        const lines = [
+            "Carregando Fazbear OS v1.0.4...",
+            "Checando alocação de memória: OK",
+            "Iniciando Módulo de Câmeras: OK",
+            "Conectando à rede neural dos animatrônicos...",
+            "AVISO: Comportamento errático detectado no Palco Principal.",
+            "AVISO: Bateria do gerador reserva comprometida.",
+            "Aguardando input do operador..."
+        ];
+
+        let lineIdx = 0;
+        function typeBoot() {
+            if(lineIdx < lines.length) {
+                bootText.innerHTML += lines[lineIdx] + "\n";
+                lineIdx++;
+                setTimeout(typeBoot, Math.random() * 400 + 100);
+            } else {
+                document.getElementById('start-btn').classList.remove('hidden');
+            }
+        }
+
+        window.onload = () => {
+            setTimeout(typeBoot, 500);
+        };
+
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('boot-screen').classList.add('hidden');
+            document.getElementById('main-os').classList.remove('hidden');
+            
+            initAudio();
+            drawStatic();
+            GAME_STATE.usage = 2; // Câmeras ligadas
+            updatePowerUI();
+            updateCameraVisuals();
+            
+            // Inicia o áudio do chiado baixo
+            gainNodeStatic.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        };
+
+    </script>
+</body>
+</html>
