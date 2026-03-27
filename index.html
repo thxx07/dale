@@ -1,937 +1,206 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fazbear Ultimate Security OS</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Creepster&display=swap" rel="stylesheet">
-    
+    <title>Basquete Local - 2 Jogadores</title>
     <style>
-        :root {
-            --fnaf-red: #cc0000;
-            --crt-bg: #050505;
-        }
-
-        body, html {
-            margin: 0; padding: 0; width: 100vw; height: 100vh;
-            background-color: #000; overflow: hidden;
-            font-family: 'VT323', monospace; color: white;
-            user-select: none;
-        }
-
-        /* --- EFEITOS DE MONITOR CRT E VIGNETTE --- */
+        body { margin: 0; overflow: hidden; background: #333; font-family: sans-serif; }
         #game-container {
-            position: relative; width: 100vw; height: 100vh;
-            display: flex; justify-content: center; align-items: center;
-            background: #000;
-        }
-
-        #monitor {
             position: relative;
-            width: 100%; max-width: 1280px;
-            height: 100%; max-height: 720px;
-            background: var(--crt-bg);
+            width: 800px;
+            height: 400px;
+            margin: 50px auto;
+            background: #e97451; /* Cor de quadra */
+            border: 5px solid #fff;
+            border-bottom: 15px solid #555;
             overflow: hidden;
-            box-shadow: 0 0 100px rgba(0,0,0,1) inset;
         }
-
-        .crt-overlay {
-            position: absolute; inset: 0; z-index: 100; pointer-events: none;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 3px, 3px 100%;
+        /* Divisor central */
+        .half-line {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: rgba(255,255,255,0.5);
         }
-
-        .scanline {
-            position: absolute; width: 100%; height: 20px;
-            background: rgba(255,255,255,0.05); z-index: 101; pointer-events: none;
-            animation: scanline 8s linear infinite;
+        /* Placar */
+        #scoreboard {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px #000;
         }
-
-        @keyframes scanline { 0% { top: -10%; } 100% { top: 110%; } }
-
-        /* --- O ESCRITÓRIO (PARALLAX 3D SIMULADO) --- */
-        #office-view {
-            position: absolute; width: 120%; height: 100%; left: -10%;
-            background: radial-gradient(circle at center, #2a2a2a 0%, #050505 80%);
-            transition: transform 0.1s ease-out;
-            display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 40px solid #111; /* Mesa */
+        .player {
+            position: absolute;
+            width: 30px;
+            height: 50px;
+            bottom: 0;
         }
-
-        /* Portas e Janelas */
-        .hallway {
-            width: 25%; height: 80%; background: #000;
-            position: relative; border: 10px solid #1a1a1a;
-            box-shadow: inset 0 0 50px #000;
-        }
-
-        .door {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(90deg, #333, #555, #333);
-            border: 2px solid #222;
-            transform: translateY(-100%); /* Aberta por padrão */
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 10;
-        }
-        .door.closed { transform: translateY(0); }
-        .door::after { content: ''; position: absolute; top:10%; width:100%; height:10px; background:#222; box-shadow: 0 50px 0 #222, 0 100px 0 #222, 0 150px 0 #222, 0 200px 0 #222, 0 250px 0 #222; }
-
-        .window {
-            width: 15%; height: 40%; background: #050505;
-            border: 8px solid #111; position: absolute; top: 20%;
-        }
-        #window-left { left: 26%; }
-        #window-right { right: 26%; }
-
-        /* Botões de Porta/Luz */
-        .control-panel {
-            position: absolute; width: 40px; height: 120px; background: #222;
-            border: 2px solid #111; display: flex; flex-direction: column;
-            justify-content: space-around; align-items: center; padding: 10px 0; z-index: 20;
-        }
-        #panel-left { left: 26%; top: 40%; transform: translateX(-100%); }
-        #panel-right { right: 26%; top: 40%; transform: translateX(100%); }
-
-        .btn-door, .btn-light {
-            width: 20px; height: 30px; border-radius: 5px; cursor: pointer;
-            border: 2px solid #000; box-shadow: 0 4px 0 #000; transition: all 0.1s;
-        }
-        .btn-door { background: #800; }
-        .btn-door.active { background: #f00; box-shadow: 0 0 0 #000; transform: translateY(4px); }
-        .btn-light { background: #ccc; }
-        .btn-light.active { background: #fff; box-shadow: 0 0 0 #000; transform: translateY(4px); box-shadow: 0 0 20px #fff; }
-
-        /* Decoração do Escritório */
-        .desk { position: absolute; bottom: 0; width: 100%; height: 25%; background: linear-gradient(#222, #050505); z-index: 15; border-top: 5px solid #111; display: flex; justify-content: center; }
-        .fan { width: 60px; height: 60px; background: #111; border-radius: 50%; position: absolute; top: -30px; border: 5px solid #333; }
-        .blades { width: 100%; height: 100%; animation: spin 0.2s linear infinite; position: relative; }
-        .blade { position: absolute; top: 10%; left: 45%; width: 10%; height: 80%; background: #555; }
-        .blade:nth-child(2) { transform: rotate(45deg); }
-        .blade:nth-child(3) { transform: rotate(90deg); }
-        .blade:nth-child(4) { transform: rotate(135deg); }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        /* --- SISTEMA DE CÂMERAS --- */
-        #camera-system {
-            position: absolute; inset: 0; background: #000; z-index: 40;
-            display: none; flex-direction: column;
-        }
-        .cam-static {
-            position: absolute; inset: 0; opacity: 0.3; pointer-events: none; mix-blend-mode: screen; z-index: 45;
-        }
+        #p1 { background: blue; left: 100px; }
+        #p2 { background: red; right: 100px; }
         
-        #cam-flip-btn {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 400px; height: 40px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
-            z-index: 30; cursor: pointer; display: flex; justify-content: center; align-items: center;
-            font-size: 24px; color: white; transition: background 0.2s;
+        .ball {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: orange;
+            border-radius: 50%;
+            border: 1px solid #000;
+            display: none;
         }
-        #cam-flip-btn:hover { background: rgba(255,255,255,0.2); }
-
-        /* UI de Bateria e Hora */
-        #hud { position: absolute; top: 20px; right: 20px; z-index: 25; text-align: right; text-shadow: 0 0 5px #fff; pointer-events: none; }
-        #hud-time { position: absolute; top: 20px; left: 20px; z-index: 25; font-size: 3rem; text-shadow: 0 0 5px #fff; pointer-events: none; }
-
-        /* Mapa e Botões das Câmeras */
-        #map-container {
-            position: absolute; bottom: 40px; right: 40px; width: 350px; height: 300px;
-            background: rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.2); z-index: 50; padding: 10px;
+        /* Cestas */
+        .hoop {
+            position: absolute;
+            top: 150px;
+            width: 40px;
+            height: 10px;
+            background: red;
         }
-        .cam-node {
-            position: absolute; background: #333; border: 2px solid #fff; color: white;
-            padding: 2px 8px; cursor: pointer; font-size: 1.2rem; transition: 0.1s;
-        }
-        .cam-node.active { background: #fff; color: #000; box-shadow: 0 0 10px #fff; }
-        
-        /* Viewport da Câmera Atual */
-        #cam-view {
-            position: absolute; inset: 0; background: radial-gradient(circle at center, #2a2a2a, #000);
-            display: flex; justify-content: center; align-items: center; z-index: 41; overflow: hidden;
-        }
-
-        /* --- ANIMATRONICS (SVGs Procedurais) --- */
-        .animatronic-svg { position: absolute; filter: drop-shadow(0 0 15px rgba(0,0,0,0.8)); transition: all 0.5s; display: none; }
-        .eyes-glow { fill: #fff; animation: glow 2s infinite alternate; }
-        .eyes-red { fill: #f00; animation: glow-red 0.5s infinite alternate; }
-        @keyframes glow { 0% { filter: drop-shadow(0 0 2px #fff); } 100% { filter: drop-shadow(0 0 8px #fff); } }
-        @keyframes glow-red { 0% { filter: drop-shadow(0 0 5px #f00); } 100% { filter: drop-shadow(0 0 15px #f00); } }
-
-        /* Iluminação no Corredor (Mecânica da Luz) */
-        .hall-light-overlay {
-            position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, transparent 70%);
-            mix-blend-mode: overlay; opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 8;
-        }
-
-        /* Jumpscare Container */
-        #jumpscare-container {
-            position: absolute; inset: 0; background: #000; z-index: 900; display: none;
-            justify-content: center; align-items: center;
-        }
-        .jumpscare-anim { animation: shake 0.05s infinite, zoomIn 0.5s forwards; }
-        
-        @keyframes shake { 0% { transform: translate(10px, 10px) rotate(0deg); } 25% { transform: translate(-10px, -10px) rotate(-2deg); } 50% { transform: translate(10px, -10px) rotate(2deg); } 75% { transform: translate(-10px, 10px) rotate(0deg); } 100% { transform: translate(10px, -10px) rotate(-1deg); } }
-        @keyframes zoomIn { 0% { transform: scale(1); } 100% { transform: scale(3); } }
-
-        /* Glitch Effect */
-        .glitch { animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite; }
-        @keyframes glitch-skew { 0% { transform: skew(0deg); } 20% { transform: skew(-20deg); } 40% { transform: skew(20deg); } 60% { transform: skew(-10deg); } 80% { transform: skew(10deg); } 100% { transform: skew(0deg); } }
-
-        /* Tela Inicial */
-        #boot-screen { position: absolute; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
-        #static-noise-canvas { position: absolute; inset: 0; opacity: 0.15; pointer-events: none; z-index: 99; }
-
+        .hoop.left { left: 0; }
+        .hoop.right { right: 0; }
     </style>
 </head>
 <body>
 
-<canvas id="static-noise-canvas"></canvas>
+<div id="scoreboard">JOGADOR 1: <span id="s1">0</span> | JOGADOR 2: <span id="s2">0</span></div>
 
-<!-- Tela de Inicialização / Aviso (Necessário para iniciar o Áudio no Navegador) -->
-<div id="boot-screen">
-    <h1 class="text-red-600 text-6xl mb-6" style="font-family: 'Creepster', cursive;">AVISO DE SEGURANÇA</h1>
-    <p class="text-xl max-w-2xl text-gray-300 mb-8 leading-relaxed">
-        Este é um simulador interativo complexo.<br>
-        Contém luzes piscantes, ruídos altos e sustos virtuais.<br>
-        Todo o áudio é gerado proceduralmente no seu navegador.<br>
-        Use fones de ouvido e ajuste o volume antes de prosseguir.
-    </p>
-    <button id="start-btn" class="px-8 py-4 border-2 border-white text-2xl hover:bg-white hover:text-black transition-all cursor-pointer">
-        INICIAR TURNO - 12:00 AM
-    </button>
-</div>
-
-<div id="game-container" style="display: none;">
-    <div id="monitor">
-        <div class="crt-overlay"></div>
-        <div class="scanline"></div>
-
-        <!-- HUD: Tempo e Energia -->
-        <div id="hud-time">12 AM</div>
-        <div id="hud">
-            <div class="text-3xl">Energia: <span id="power-val">100</span>%</div>
-            <div class="text-2xl mt-2 text-green-400">Uso: <span id="usage-val">▮▯▯▯▯</span></div>
-        </div>
-
-        <!-- VISÃO DO ESCRITÓRIO -->
-        <div id="office-view">
-            <!-- Corredor Esquerdo -->
-            <div class="hallway" id="hall-left">
-                <div class="door" id="door-left"></div>
-                <div class="hall-light-overlay" id="light-overlay-left"></div>
-                <!-- Bonnie no corredor -->
-                <svg id="bonnie-door" class="animatronic-svg w-full h-full" style="left:0; top:20%;" viewBox="0 0 100 100">
-                    <path d="M35,60 C35,40 65,40 65,60 C75,70 70,100 50,100 C30,100 25,70 35,60 Z" fill="#2d2d44"/>
-                    <path d="M35,45 C25,20 40,5 45,40 Z" fill="#2d2d44"/> <path d="M65,45 C75,20 60,5 55,40 Z" fill="#2d2d44"/>
-                    <circle cx="42" cy="65" r="3" class="eyes-glow hidden eye-left"/>
-                    <circle cx="58" cy="65" r="3" class="eyes-glow hidden eye-right"/>
-                </svg>
-            </div>
-
-            <!-- Painel Esquerdo -->
-            <div class="control-panel" id="panel-left">
-                <div class="btn-door" id="btn-door-left"></div>
-                <div class="text-xs text-white">DOOR</div>
-                <div class="btn-light" id="btn-light-left"></div>
-                <div class="text-xs text-white">LIGHT</div>
-            </div>
-
-            <!-- Janelas -->
-            <div class="window" id="window-left"></div>
-            <div class="window" id="window-right"></div>
-
-            <!-- Corredor Direito -->
-            <div class="hallway" id="hall-right">
-                <div class="door" id="door-right"></div>
-                <div class="hall-light-overlay" id="light-overlay-right"></div>
-                <!-- Chica no corredor -->
-                <svg id="chica-door" class="animatronic-svg w-full h-full" style="left:0; top:30%;" viewBox="0 0 100 100">
-                    <circle cx="50" cy="70" r="25" fill="#c4c400"/>
-                    <path d="M35,75 Q50,90 65,75" stroke="#f90" stroke-width="6" fill="transparent"/>
-                    <circle cx="42" cy="60" r="4" class="eyes-glow hidden eye-left"/>
-                    <circle cx="58" cy="60" r="4" class="eyes-glow hidden eye-right"/>
-                </svg>
-            </div>
-
-            <!-- Painel Direito -->
-            <div class="control-panel" id="panel-right">
-                <div class="btn-door" id="btn-door-right"></div>
-                <div class="text-xs text-white">DOOR</div>
-                <div class="btn-light" id="btn-light-right"></div>
-                <div class="text-xs text-white">LIGHT</div>
-            </div>
-
-            <!-- Mesa e Ventilador -->
-            <div class="desk">
-                <div class="fan">
-                    <div class="blades">
-                        <div class="blade"></div><div class="blade"></div><div class="blade"></div><div class="blade"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- BOTÃO DE ABRIR CÂMERAS -->
-        <div id="cam-flip-btn">▲ SISTEMA DE CÂMERAS ▲</div>
-
-        <!-- SISTEMA DE CÂMERAS -->
-        <div id="camera-system">
-            <div class="cam-static" id="cam-static-overlay"></div>
-            
-            <div id="cam-view">
-                <div class="absolute top-10 left-10 text-4xl text-white opacity-50 tracking-widest border border-white p-2" id="cam-name-display">CAM 1A - PALCO</div>
-                <div class="absolute top-10 right-10 text-2xl text-red-600 animate-pulse border border-red-600 px-2 py-1">● REC</div>
-                
-                <!-- SVGs Animatronics (Renderizados nas Câmeras) -->
-                <!-- Freddy -->
-                <svg id="cam-freddy" class="animatronic-svg w-64 h-64 absolute" viewBox="0 0 100 100">
-                    <path d="M30,50 C30,30 70,30 70,50 C80,50 85,60 80,70 C75,80 60,90 50,90 C40,90 25,80 20,70 C15,60 20,50 30,50 Z" fill="#3b2b1c"/>
-                    <path d="M40,20 L40,35 L60,35 L60,20 Z" fill="#111"/> <circle cx="25" cy="40" r="10" fill="#3b2b1c"/> <circle cx="75" cy="40" r="10" fill="#3b2b1c"/>
-                    <circle cx="40" cy="55" r="3" class="eyes-glow eye-left hidden"/> <circle cx="60" cy="55" r="3" class="eyes-glow eye-right hidden"/>
-                </svg>
-                <!-- Bonnie -->
-                <svg id="cam-bonnie" class="animatronic-svg w-60 h-60 absolute" viewBox="0 0 100 100">
-                    <path d="M35,50 C35,35 65,35 65,50 C75,60 70,80 50,85 C30,80 25,60 35,50 Z" fill="#2d2d44"/>
-                    <path d="M35,40 C30,20 40,10 45,35 Z" fill="#2d2d44"/> <path d="M65,40 C70,20 60,10 55,35 Z" fill="#2d2d44"/>
-                    <circle cx="42" cy="55" r="2.5" class="eyes-glow eye-left hidden"/> <circle cx="58" cy="55" r="2.5" class="eyes-glow eye-right hidden"/>
-                </svg>
-                <!-- Chica -->
-                <svg id="cam-chica" class="animatronic-svg w-56 h-56 absolute" viewBox="0 0 100 100">
-                    <circle cx="50" cy="55" r="25" fill="#c4c400"/>
-                    <path d="M30,60 Q50,75 70,60" stroke="#f90" stroke-width="4" fill="transparent"/>
-                    <circle cx="40" cy="45" r="3" class="eyes-glow eye-left hidden"/> <circle cx="60" cy="45" r="3" class="eyes-glow eye-right hidden"/>
-                </svg>
-                <!-- Foxy (Pirate Cove Cortina / Corrida) -->
-                <svg id="cam-foxy" class="animatronic-svg w-72 h-72 absolute hidden" viewBox="0 0 100 100">
-                    <!-- Foxy Stage 1-3 -->
-                    <g id="foxy-body">
-                        <path d="M40,50 L60,50 L65,70 L35,70 Z" fill="#8b0000"/>
-                        <circle cx="50" cy="40" r="15" fill="#8b0000"/>
-                        <path d="M40,40 L60,40 L65,30 L35,30 Z" fill="#8b0000"/> <!-- Focinho -->
-                        <rect x="52" y="32" width="10" height="8" fill="#111" transform="rotate(15 52 32)"/> <!-- Tapa-olho -->
-                        <circle cx="42" cy="35" r="3" class="eyes-glow"/> <!-- Olho amarelo -->
-                        <path d="M70,60 C80,60 85,50 85,40 C75,40 70,50 70,60 Z" fill="#aaa"/> <!-- Gancho -->
-                    </g>
-                </svg>
-            </div>
-
-            <!-- Mapa Overlay -->
-            <div id="map-container">
-                <svg width="100%" height="100%" viewBox="0 0 350 300" class="absolute inset-0 opacity-40">
-                    <rect x="120" y="20" width="100" height="60" fill="none" stroke="white" stroke-width="2"/> <!-- 1A Palco -->
-                    <rect x="100" y="80" width="140" height="80" fill="none" stroke="white" stroke-width="2"/> <!-- 1B Refeitorio -->
-                    <rect x="20" y="100" width="80" height="60" fill="none" stroke="white" stroke-width="2"/> <!-- 1C Pirate Cove -->
-                    <rect x="20" y="180" width="60" height="80" fill="none" stroke="white" stroke-width="2"/> <!-- 2A Corredor Oeste -->
-                    <rect x="260" y="180" width="60" height="80" fill="none" stroke="white" stroke-width="2"/> <!-- 4A Corredor Leste -->
-                    <rect x="140" y="260" width="60" height="40" fill="none" stroke="white" stroke-width="2"/> <!-- Office -->
-                    <path d="M80,220 L140,280 M260,220 L200,280" stroke="white" stroke-width="2" fill="none" stroke-dasharray="5,5"/>
-                </svg>
-                
-                <button class="cam-node active" style="top: 35px; left: 145px;" data-cam="1A">1A</button>
-                <button class="cam-node" style="top: 105px; left: 145px;" data-cam="1B">1B</button>
-                <button class="cam-node" style="top: 115px; left: 35px;" data-cam="1C">1C</button>
-                <button class="cam-node" style="top: 205px; left: 30px;" data-cam="2A">2A</button>
-                <button class="cam-node" style="top: 240px; left: 30px;" data-cam="2B">2B</button>
-                <button class="cam-node" style="top: 205px; left: 270px;" data-cam="4A">4A</button>
-                <button class="cam-node" style="top: 240px; left: 270px;" data-cam="4B">4B</button>
-                <div class="absolute bottom-2 right-2 text-xs border border-white px-1">MAPA DAS CÂMERAS</div>
-            </div>
-        </div>
-
-        <!-- JUMPSCARE CONTAINER -->
-        <div id="jumpscare-container">
-            <svg id="jumpscare-svg" class="w-full h-full jumpscare-anim" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"></svg>
-        </div>
-
-    </div>
+<div id="game-container" id="court">
+    <div class="half-line"></div>
+    <div id="hoop-left" class="hoop left"></div>
+    <div id="hoop-right" class="hoop right"></div>
+    <div id="p1" class="player"></div>
+    <div id="p2" class="player"></div>
+    <div id="ball1" class="ball"></div>
+    <div id="ball2" class="ball"></div>
 </div>
 
 <script>
-/**
- * FAZBEAR ULTIMATE WEB OS ENGINE
- * Todo o sistema roda sem dependências externas.
- */
-
-// ==========================================
-// 1. ENGINE DE ÁUDIO PROCEDURAL (Web Audio API)
-// ==========================================
-const AudioEngine = {
-    ctx: null,
-    nodes: {},
-    
-    init() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.startHum();
-    },
-
-    // Zumbido grave constante do escritório
-    startHum() {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 60; // Muito grave
-        gain.gain.value = 0.3;
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        this.nodes.hum = gain;
-    },
-
-    // Chiado das câmeras (White Noise)
-    startStatic() {
-        const bufferSize = this.ctx.sampleRate * 2;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-        
-        const noiseSource = this.ctx.createBufferSource();
-        noiseSource.buffer = buffer;
-        noiseSource.loop = true;
-        
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'highpass'; filter.frequency.value = 1000;
-        
-        const gain = this.ctx.createGain();
-        gain.gain.value = 0; // Inicia mudo
-        
-        noiseSource.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx.destination);
-        noiseSource.start();
-        this.nodes.camStatic = gain;
-    },
-
-    setStaticVolume(vol) {
-        if(this.nodes.camStatic) this.nodes.camStatic.gain.setValueAtTime(vol, this.ctx.currentTime);
-    },
-
-    // Efeito sonoro de troca de câmera (Blip + Estática rápida)
-    playCamSwitch() {
-        if(!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.1);
-
-        this.setStaticVolume(0.5);
-        setTimeout(() => this.setStaticVolume(0.1), 150);
-    },
-
-    // Som de porta fechando (Buzz grave)
-    playDoor() {
-        if(!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.3);
-    },
-
-    // Som da Luz (Click)
-    playLight() {
-        if(!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1500, this.ctx.currentTime);
-        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.05);
-    },
-
-    // Jumpscare Scream (Síntese agressiva)
-    playJumpscare() {
-        if(!this.ctx) return;
-        // Combinação de osciladores dissonantes
-        const freqs = [300, 315, 330, 800, 1200];
-        const mainGain = this.ctx.createGain();
-        mainGain.gain.setValueAtTime(1, this.ctx.currentTime);
-        mainGain.connect(this.ctx.destination);
-
-        freqs.forEach(f => {
-            const osc = this.ctx.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.value = f;
-            
-            // LFO para fazer o som tremer
-            const lfo = this.ctx.createOscillator();
-            lfo.type = 'square';
-            lfo.frequency.value = 50;
-            const lfoGain = this.ctx.createGain();
-            lfoGain.gain.value = 500;
-            lfo.connect(lfoGain);
-            lfoGain.connect(osc.frequency);
-            lfo.start();
-
-            osc.connect(mainGain);
-            osc.start();
-            osc.stop(this.ctx.currentTime + 2);
-            lfo.stop(this.ctx.currentTime + 2);
-        });
-    },
-    
-    // Música da caixa de música (Apagão do Freddy)
-    playMusicBox() {
-        if(!this.ctx) return;
-        const notes = [349.23, 349.23, 392.00, 349.23, 261.63]; // F4 F4 G4 F4 C4 (Toreador March simulação)
-        let time = this.ctx.currentTime + 0.5;
-        
-        notes.forEach((freq, i) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0, time);
-            gain.gain.linearRampToValueAtTime(0.3, time + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.8);
-            
-            osc.connect(gain); gain.connect(this.ctx.destination);
-            osc.start(time); osc.stop(time + 1);
-            time += 0.8;
-        });
-    }
-};
-
-// ==========================================
-// 2. SISTEMA DE VÍDEO / CANVAS (ESTÁTICA)
-// ==========================================
-const canvas = document.getElementById('static-noise-canvas');
-const ctx = canvas.getContext('2d');
-let staticAnim;
-
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-function drawStatic() {
-    const w = canvas.width, h = canvas.height;
-    const idata = ctx.createImageData(w, h);
-    const buffer = new Uint32Array(idata.data.buffer);
-    for (let i = 0; i < buffer.length; i++) {
-        const val = Math.random() * 255 | 0;
-        buffer[i] = (255 << 24) | (val << 16) | (val << 8) | val;
-    }
-    ctx.putImageData(idata, 0, 0);
-    staticAnim = requestAnimationFrame(drawStatic);
-}
-
-// ==========================================
-// 3. ESTADO DO JOGO E INTELIGÊNCIA ARTIFICIAL
-// ==========================================
-const GAME = {
-    time: 0, // 0 a 6 (12am - 6am)
-    power: 100,
-    usage: 1, // 1 a 5
-    isCamActive: false,
-    currentCam: '1A',
-    isDead: false,
-    won: false,
-    
-    // Controles do Escritório
-    doors: { left: false, right: false },
-    lights: { left: false, right: false },
-    
-    // Inteligência Artificial (Nível e Posição)
-    animatronics: {
-        bonnie: { ai: 3, loc: '1A', route: ['1A', '1B', '2A', '2B', 'Office_Left'] },
-        chica:  { ai: 3, loc: '1A', route: ['1A', '1B', '4A', '4B', 'Office_Right'] },
-        freddy: { ai: 1, loc: '1A', route: ['1A', '1B', '4A', '4B', 'Office_Right'] },
-        foxy:   { ai: 2, loc: '1C', state: 0 } // 0: Closed, 1: Peek, 2: Out, 3: Running
-    },
-    
-    intervals: {}
-};
-
-// Mapas visuais e nomes das câmeras
-const CAM_DATA = {
-    '1A': { name: 'CAM 1A - PALCO PRINCIPAL', bg: 'radial-gradient(circle at center, #2a2a2a, #000)' },
-    '1B': { name: 'CAM 1B - ÁREA DE REFEIÇÕES', bg: 'radial-gradient(circle at center, #1a2a3a, #000)' },
-    '1C': { name: 'CAM 1C - ENSEADA DO PIRATA', bg: 'radial-gradient(circle at center, #2a1a3a, #000)' },
-    '2A': { name: 'CAM 2A - CORREDOR OESTE', bg: 'radial-gradient(circle at center, #1a3a1a, #000)' },
-    '2B': { name: 'CAM 2B - ESQUINA OESTE', bg: 'radial-gradient(circle at center, #0a2a0a, #000)' },
-    '4A': { name: 'CAM 4A - CORREDOR LESTE', bg: 'radial-gradient(circle at center, #3a1a1a, #000)' },
-    '4B': { name: 'CAM 4B - ESQUINA LESTE', bg: 'radial-gradient(circle at center, #2a0a0a, #000)' }
-};
-
-// ==========================================
-// 4. LÓGICA PRINCIPAL DO GAME LOOP
-// ==========================================
-function updateUsage() {
-    let u = 1; // Base
-    if(GAME.isCamActive) u++;
-    if(GAME.doors.left) u++;
-    if(GAME.doors.right) u++;
-    if(GAME.lights.left) u++;
-    if(GAME.lights.right) u++;
-    GAME.usage = u;
-    
-    let bars = '';
-    for(let i=0; i<5; i++) bars += (i < u) ? '▮' : '▯';
-    document.getElementById('usage-val').innerText = bars;
-    
-    const usageEl = document.getElementById('usage-val');
-    usageEl.className = u <= 2 ? 'text-green-400' : (u <= 4 ? 'text-yellow-400' : 'text-red-600');
-}
-
-function powerDrain() {
-    if(GAME.isDead || GAME.won) return;
-    const drainRates = [0, 0.1, 0.25, 0.4, 0.6, 0.8]; // Drain por tick baseado no usage
-    GAME.power -= drainRates[GAME.usage];
-    
-    if(GAME.power <= 0) {
-        GAME.power = 0;
-        triggerPowerOutage();
-    }
-    document.getElementById('power-val').innerText = Math.floor(GAME.power);
-}
-
-function timeTick() {
-    if(GAME.isDead || GAME.won) return;
-    GAME.time++;
-    document.getElementById('hud-time').innerText = `${GAME.time === 0 ? 12 : GAME.time} AM`;
-    
-    // Aumenta dificuldade ao longo da noite
-    GAME.animatronics.bonnie.ai += 1;
-    GAME.animatronics.chica.ai += 1;
-    if(GAME.time >= 3) GAME.animatronics.freddy.ai += 2;
-
-    if(GAME.time === 6) winGame();
-}
-
-// Lógica de Movimentação da IA (Acontece a cada X segundos)
-function aiTick() {
-    if(GAME.isDead || GAME.won) return;
-
-    // Movement Check
-    const tryMove = (animatronic, route) => {
-        if(Math.random() * 20 <= animatronic.ai) {
-            let currentIdx = route.indexOf(animatronic.loc);
-            if(currentIdx < route.length - 1) {
-                // Avança na rota
-                animatronic.loc = route[currentIdx + 1];
-                if(GAME.isCamActive) glitchEffect(); // Dá um glitch na câmera se eles se movem
-            }
-        }
+    const config = {
+        gravity: 0.6,
+        jumpForce: -12,
+        speed: 5,
+        courtWidth: 800,
+        courtHeight: 400
     };
 
-    // Bonnie & Chica
-    tryMove(GAME.animatronics.bonnie, GAME.animatronics.bonnie.route);
-    tryMove(GAME.animatronics.chica, GAME.animatronics.chica.route);
-
-    // Foxy Logic (Baseado em não olhar pra ele)
-    if(GAME.currentCam !== '1C' || !GAME.isCamActive) {
-        if(Math.random() * 20 <= GAME.animatronics.foxy.ai) {
-            GAME.animatronics.foxy.state++;
-            if(GAME.animatronics.foxy.state > 3) {
-                // Foxy Run!
-                GAME.animatronics.foxy.loc = '2A';
-                setTimeout(() => {
-                    GAME.animatronics.foxy.loc = 'Office_Left';
-                    checkKill('foxy', 'left');
-                }, 5000); // 5 segundos pra fechar a porta
-            }
-        }
-    }
-
-    // Kill checks se estiverem na porta
-    if(GAME.animatronics.bonnie.loc === 'Office_Left') checkKill('bonnie', 'left');
-    if(GAME.animatronics.chica.loc === 'Office_Right') checkKill('chica', 'right');
-
-    updateVisuals();
-}
-
-function checkKill(who, side) {
-    // Dá um tempo de reação de alguns segundos. Se a porta não estiver fechada, JUMPSCARE.
-    setTimeout(() => {
-        if(GAME.isDead || GAME.won) return;
-        if((side === 'left' && !GAME.doors.left) || (side === 'right' && !GAME.doors.right)) {
-            triggerJumpscare(who);
-        } else {
-            // Porta estava fechada, o animatronic desiste e volta
-            if(who === 'bonnie') GAME.animatronics.bonnie.loc = '1B';
-            if(who === 'chica') GAME.animatronics.chica.loc = '1B';
-            if(who === 'foxy') { GAME.animatronics.foxy.loc = '1C'; GAME.animatronics.foxy.state = 0; }
-            updateVisuals();
-        }
-    }, 4000);
-}
-
-// ==========================================
-// 5. ATUALIZAÇÃO VISUAL (DOM & SVGs)
-// ==========================================
-function updateVisuals() {
-    // 1. Atualizar HUD nas portas (Escritório)
-    const bDoor = document.getElementById('bonnie-door');
-    const cDoor = document.getElementById('chica-door');
-    
-    // Só mostra no corredor se a luz estiver acesa
-    if(GAME.animatronics.bonnie.loc === 'Office_Left' && GAME.lights.left) {
-        bDoor.style.display = 'block';
-        // Fazer os olhos brilharem
-        bDoor.querySelectorAll('.eyes-glow').forEach(e => e.classList.remove('hidden'));
-    } else {
-        bDoor.style.display = 'none';
-    }
-
-    if(GAME.animatronics.chica.loc === 'Office_Right' && GAME.lights.right) {
-        cDoor.style.display = 'block';
-        cDoor.querySelectorAll('.eyes-glow').forEach(e => e.classList.remove('hidden'));
-    } else {
-        cDoor.style.display = 'none';
-    }
-
-    // 2. Atualizar Sistema de Câmeras
-    if(GAME.isCamActive) {
-        document.getElementById('cam-name-display').innerText = CAM_DATA[GAME.currentCam].name;
-        document.getElementById('cam-view').style.background = CAM_DATA[GAME.currentCam].bg;
-
-        // Mostrar Freddy
-        const camFreddy = document.getElementById('cam-freddy');
-        if(GAME.animatronics.freddy.loc === GAME.currentCam) {
-            camFreddy.style.display = 'block';
-            camFreddy.style.left = '40%'; camFreddy.style.top = '30%';
-            if(GAME.time > 3) camFreddy.querySelectorAll('.eyes-glow').forEach(e => e.classList.remove('hidden'));
-        } else camFreddy.style.display = 'none';
-
-        // Mostrar Bonnie
-        const camBonnie = document.getElementById('cam-bonnie');
-        if(GAME.animatronics.bonnie.loc === GAME.currentCam) {
-            camBonnie.style.display = 'block';
-            camBonnie.style.left = GAME.animatronics.freddy.loc === GAME.currentCam ? '10%' : '30%';
-            camBonnie.style.top = '40%';
-            if(GAME.currentCam === '2B') { camBonnie.style.transform = 'scale(1.5)'; } else { camBonnie.style.transform = 'scale(1)'; }
-        } else camBonnie.style.display = 'none';
-
-        // Mostrar Chica
-        const camChica = document.getElementById('cam-chica');
-        if(GAME.animatronics.chica.loc === GAME.currentCam) {
-            camChica.style.display = 'block';
-            camChica.style.left = GAME.animatronics.freddy.loc === GAME.currentCam ? '60%' : '40%';
-            camChica.style.top = '35%';
-        } else camChica.style.display = 'none';
-
-        // Mostrar Foxy (Apenas na 1C ou 2A)
-        const camFoxy = document.getElementById('cam-foxy');
-        if(GAME.currentCam === '1C' && GAME.animatronics.foxy.loc === '1C') {
-            camFoxy.style.display = 'block';
-            camFoxy.style.left = '30%'; camFoxy.style.top = '40%';
-            camFoxy.style.opacity = GAME.animatronics.foxy.state * 0.3; // Aparece aos poucos
-        } else if(GAME.currentCam === '2A' && GAME.animatronics.foxy.loc === '2A') {
-            camFoxy.style.display = 'block';
-            camFoxy.style.left = '20%'; camFoxy.style.top = '50%';
-            camFoxy.style.opacity = 1;
-        } else {
-            camFoxy.style.display = 'none';
-        }
-    }
-}
-
-function glitchEffect() {
-    const v = document.getElementById('cam-view');
-    v.classList.add('glitch');
-    AudioEngine.setStaticVolume(0.8);
-    setTimeout(() => {
-        v.classList.remove('glitch');
-        if(GAME.isCamActive) AudioEngine.setStaticVolume(0.1);
-    }, 400);
-}
-
-// ==========================================
-// 6. INTERAÇÃO DO JOGADOR (UI)
-// ==========================================
-
-// Parallax do Mouse no Escritório
-document.addEventListener('mousemove', (e) => {
-    if(GAME.isCamActive || GAME.isDead) return;
-    const x = e.clientX / window.innerWidth;
-    const offset = (x - 0.5) * 20; // Move entre -10% e +10%
-    document.getElementById('office-view').style.transform = `translateX(${-offset}%)`;
-});
-
-// Botões de Porta e Luz
-function toggleDoor(side) {
-    if(GAME.power <= 0) return;
-    GAME.doors[side] = !GAME.doors[side];
-    AudioEngine.playDoor();
-    
-    const doorEl = document.getElementById(`door-${side}`);
-    const btnEl = document.getElementById(`btn-door-${side}`);
-    
-    if(GAME.doors[side]) {
-        doorEl.classList.add('closed');
-        btnEl.classList.add('active');
-    } else {
-        doorEl.classList.remove('closed');
-        btnEl.classList.remove('active');
-    }
-    updateUsage();
-}
-
-function toggleLight(side) {
-    if(GAME.power <= 0) return;
-    // Desliga a outra luz se estiver ligada (mecânica do FNAF)
-    const otherSide = side === 'left' ? 'right' : 'left';
-    if(GAME.lights[otherSide]) {
-        GAME.lights[otherSide] = false;
-        document.getElementById(`btn-light-${otherSide}`).classList.remove('active');
-        document.getElementById(`light-overlay-${otherSide}`).style.opacity = 0;
-    }
-
-    GAME.lights[side] = !GAME.lights[side];
-    AudioEngine.playLight();
-    
-    const overlayEl = document.getElementById(`light-overlay-${side}`);
-    const btnEl = document.getElementById(`btn-light-${side}`);
-    
-    if(GAME.lights[side]) {
-        overlayEl.style.opacity = 1;
-        btnEl.classList.add('active');
-    } else {
-        overlayEl.style.opacity = 0;
-        btnEl.classList.remove('active');
-    }
-    updateUsage();
-    updateVisuals(); // Para revelar o animatronic se ele estiver lá
-}
-
-document.getElementById('btn-door-left').onclick = () => toggleDoor('left');
-document.getElementById('btn-door-right').onclick = () => toggleDoor('right');
-document.getElementById('btn-light-left').onclick = () => toggleLight('left');
-document.getElementById('btn-light-right').onclick = () => toggleLight('right');
-
-// Ligar/Desligar Câmeras
-document.getElementById('cam-flip-btn').onclick = () => {
-    if(GAME.power <= 0 || GAME.isDead) return;
-    GAME.isCamActive = !GAME.isCamActive;
-    AudioEngine.playCamSwitch();
-    
-    const camSys = document.getElementById('camera-system');
-    if(GAME.isCamActive) {
-        camSys.style.display = 'flex';
-        AudioEngine.startStatic();
-        AudioEngine.setStaticVolume(0.1);
-        updateVisuals();
-    } else {
-        camSys.style.display = 'none';
-        AudioEngine.setStaticVolume(0);
-    }
-    updateUsage();
-};
-
-// Trocar de Câmera
-document.querySelectorAll('.cam-node').forEach(btn => {
-    btn.onclick = (e) => {
-        if(!GAME.isCamActive || GAME.power <= 0) return;
-        document.querySelectorAll('.cam-node').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        GAME.currentCam = e.target.getAttribute('data-cam');
-        AudioEngine.playCamSwitch();
-        updateVisuals();
+    const gameState = {
+        p1: { x: 100, y: 0, vy: 0, score: 0, jumping: false, ball: { active: false, x: 0, y: 0, vx: 0, vy: 0 } },
+        p2: { x: 670, y: 0, vy: 0, score: 0, jumping: false, ball: { active: false, x: 0, y: 0, vx: 0, vy: 0 } }
     };
-});
 
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
 
-// ==========================================
-// 7. EVENTOS DE FIM DE JOGO
-// ==========================================
-function triggerPowerOutage() {
-    if(GAME.isDead) return;
-    GAME.isDead = true;
-    GAME.isCamActive = false;
-    document.getElementById('camera-system').style.display = 'none';
-    
-    // Apaga todas as luzes e abre portas
-    document.querySelectorAll('.door').forEach(d => d.classList.remove('closed'));
-    document.querySelectorAll('.hall-light-overlay').forEach(l => l.style.opacity = 0);
-    document.getElementById('office-view').style.background = '#000';
-    document.querySelectorAll('.desk, .control-panel, .fan, #hud').forEach(el => el.style.display = 'none');
-    
-    // Silêncio
-    if(AudioEngine.nodes.hum) AudioEngine.nodes.hum.gain.exponentialRampToValueAtTime(0.01, AudioEngine.ctx.currentTime + 1);
-    AudioEngine.setStaticVolume(0);
+    function update() {
+        // Controle Jogador 1 (A, D, W para pular, Espaço para chutar)
+        if (keys['KeyA'] && gameState.p1.x > 0) gameState.p1.x -= config.speed;
+        if (keys['KeyD'] && gameState.p1.x < 370) gameState.p1.x += config.speed;
+        if (keys['KeyW'] && !gameState.p1.jumping) {
+            gameState.p1.vy = config.jumpForce;
+            gameState.p1.jumping = true;
+        }
 
-    // Sequência do Freddy
-    setTimeout(() => {
-        AudioEngine.playMusicBox();
-        const freddyFace = document.createElement('div');
-        freddyFace.innerHTML = `<svg class="w-48 h-48 absolute" style="left:10%; top:30%;" viewBox="0 0 100 100">
-            <path d="M30,50 C30,30 70,30 70,50 C80,50 85,60 80,70 Z" fill="#111"/>
-            <circle cx="40" cy="55" r="4" fill="#fff" class="animate-pulse shadow-[0_0_15px_#fff]"/>
-            <circle cx="60" cy="55" r="4" fill="#fff" class="animate-pulse shadow-[0_0_15px_#fff]"/>
-        </svg>`;
-        document.getElementById('office-view').appendChild(freddyFace);
-        
-        // Jumpscare inevitável
-        setTimeout(() => triggerJumpscare('freddy'), 8000 + Math.random() * 5000);
-    }, 5000);
-}
+        // Controle Jogador 2 (Setas e Enter para chutar)
+        if (keys['ArrowLeft'] && gameState.p2.x > 400) gameState.p2.x -= config.speed;
+        if (keys['ArrowRight'] && gameState.p2.x < 770) gameState.p2.x += config.speed;
+        if (keys['ArrowUp'] && !gameState.p2.jumping) {
+            gameState.p2.vy = config.jumpForce;
+            gameState.p2.jumping = true;
+        }
 
-function triggerJumpscare(animatronic) {
-    if(GAME.won) return;
-    GAME.isDead = true;
-    
-    const jcContainer = document.getElementById('jumpscare-container');
-    const svg = document.getElementById('jumpscare-svg');
-    
-    jcContainer.style.display = 'flex';
-    AudioEngine.playJumpscare();
-    
-    // Pega o path do animatronic que matou e clona pro jumpscare
-    let sourceId = animatronic === 'freddy' ? 'cam-freddy' : (animatronic === 'foxy' ? 'cam-foxy' : `cam-${animatronic}`);
-    svg.innerHTML = document.getElementById(sourceId).innerHTML;
-    // Força olhos vermelhos
-    svg.innerHTML += `<circle cx="40" cy="55" r="6" fill="#f00"/><circle cx="60" cy="55" r="6" fill="#f00"/>`;
+        // Arremessos
+        if (keys['Space'] && !gameState.p1.ball.active) shoot(1);
+        if (keys['Enter'] && !gameState.p2.ball.active) shoot(2);
 
-    // Tela de Game Over
-    setTimeout(() => {
-        jcContainer.innerHTML = '<div class="text-red-600 text-6xl text-center" style="font-family:\'Creepster\', cursive;">GAME OVER<br><button onclick="location.reload()" class="mt-8 text-2xl text-white border p-2 hover:bg-white hover:text-black">Tentar Novamente</button></div>';
-        jcContainer.style.background = '#000';
-    }, 1500);
-}
+        applyPhysics(gameState.p1, 'p1');
+        applyPhysics(gameState.p2, 'p2');
+        updateBall(gameState.p1.ball, 1);
+        updateBall(gameState.p2.ball, 2);
 
-function winGame() {
-    if(GAME.isDead) return;
-    GAME.won = true;
-    // Limpa a tela e mostra 6 AM
-    const mon = document.getElementById('monitor');
-    mon.innerHTML = '<div class="w-full h-full bg-black flex flex-col justify-center items-center z-[9999] absolute"><div class="text-yellow-400 text-8xl mb-8" style="text-shadow: 0 0 20px #ff0;">6:00 AM</div><div class="text-white text-3xl">Turno Sobrevivido.</div><button onclick="location.reload()" class="mt-8 text-xl text-white border p-2 hover:bg-white hover:text-black z-[10000]">Finalizar Trabalho</button></div>';
-}
+        draw();
+        requestAnimationFrame(update);
+    }
 
-// ==========================================
-// 8. BOOT E INICIALIZAÇÃO
-// ==========================================
-document.getElementById('start-btn').onclick = () => {
-    // Permissão do Browser
-    AudioEngine.init();
-    
-    document.getElementById('boot-screen').style.display = 'none';
-    document.getElementById('game-container').style.display = 'flex';
-    
-    drawStatic();
-    
-    // Inicia os loops
-    GAME.intervals.drain = setInterval(powerDrain, 1500); // Drena a cada 1.5s
-    GAME.intervals.time = setInterval(timeTick, 60000); // 1 minuto real = 1 hora no jogo (6 min total)
-    GAME.intervals.ai = setInterval(aiTick, 4000); // IA toma decisão a cada 4 seg
-    
-    updateUsage();
-    updateVisuals();
-};
+    function applyPhysics(player, id) {
+        player.vy += config.gravity;
+        player.y += player.vy;
 
+        if (player.y >= 0) {
+            player.y = 0;
+            player.vy = 0;
+            player.jumping = false;
+        }
+    }
+
+    function shoot(playerNum) {
+        const p = gameState[`p${playerNum}`];
+        p.ball.active = true;
+        p.ball.x = p.x + 15;
+        p.ball.y = 350 + p.y;
+        p.ball.vy = -15;
+        p.ball.vx = playerNum === 1 ? 7 : -7;
+    }
+
+    function updateBall(ball, playerNum) {
+        if (!ball.active) return;
+
+        ball.vy += config.gravity;
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Colisão com a cesta adversária
+        if (playerNum === 1 && ball.x > 760 && ball.y < 160 && ball.y > 140) {
+            gameState.p1.score++;
+            resetBall(ball);
+        }
+        if (playerNum === 2 && ball.x < 40 && ball.y < 160 && ball.y > 140) {
+            gameState.p2.score++;
+            resetBall(ball);
+        }
+
+        // Saiu da tela ou chão
+        if (ball.y > 400 || ball.x < 0 || ball.x > 800) {
+            resetBall(ball);
+        }
+    }
+
+    function resetBall(ball) {
+        ball.active = false;
+    }
+
+    function draw() {
+        const p1El = document.getElementById('p1');
+        const p2El = document.getElementById('p2');
+        const b1El = document.getElementById('ball1');
+        const b2El = document.getElementById('ball2');
+
+        p1El.style.transform = `translate(${gameState.p1.x}px, ${gameState.p1.y}px)`;
+        p2El.style.transform = `translate(${gameState.p2.x}px, ${gameState.p2.y}px)`;
+
+        renderBall(b1El, gameState.p1.ball);
+        renderBall(b2El, gameState.p2.ball);
+
+        document.getElementById('s1').innerText = gameState.p1.score;
+        document.getElementById('s2').innerText = gameState.p2.score;
+    }
+
+    function renderBall(el, ball) {
+        if (ball.active) {
+            el.style.display = 'block';
+            el.style.left = ball.x + 'px';
+            el.style.top = ball.y + 'px';
+        } else {
+            el.style.display = 'none';
+        }
+    }
+
+    update();
 </script>
+
 </body>
 </html>
